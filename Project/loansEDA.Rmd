@@ -1,0 +1,1068 @@
+---
+title: "Loan Data EDA"
+author: "Marissa Schmucker"
+date: "February, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+```
+
+# 2014 Prosper Loan Data Exploration
+  
+![](logo_prosper.jpg)
+
+[Prosper Website](www.prosper.com)
+  
+  
+>Prosper is America's first marketplace lending platform, with over $10 billion in funded loans.
+
+>Prosper allows people to invest in each other in a way that is financially and socially rewarding. On Prosper, borrowers list loan requests between $2,000 and $35,000 and individual investors invest as little as $25 in each loan listing they select. Prosper handles the servicing of the loan on behalf of the matched borrowers and investors.
+
+>Prosper Funding LLC is a wholly-owned subsidiary of Prosper Marketplace, Inc.
+
+>Prosper Marketplace is backed by leading investors including Sequoia Capital, Francisco Partners, Institutional Venture Partners, and Credit Suisse NEXT Fund.
+  
+  
+```{r loans}
+
+loans <- read.csv('prosperLoanData.csv')
+
+```
+
+## Variables to Explore
+  
+There are 81 variables, of which we will be exploring 15. 
+  
++ Term
++ LoanStatus
++ BorrowerRate
++ ListingCategory
++ BorrowerState
++ Occupation 
++ EmploymentStatus 
++ CreditScoreRangeLower
++ CreditScoreRangeUpper
++ OpenCreditLines
++ CurrentDelinquencies
++ AmountDelinquent
++ DebttoIncomeRatio
++ StatedMonthlyIncome
++ MonthlyLoanPayment  
+    
+    
+To clean up our data, we will extract NAs to form a new object called noNA.  Also, the variable "ListingCategory..numeric." will be renamed "ListingCategory".  "Term" and "ListingCategory" will be changed from numeric(int) to categorical(fctr).
+  
+```{r variables}
+
+library(memisc)
+library(stringr)
+library(plyr)
+
+ncol(loans)  #Number of Loans
+names(loans) #Number of Variables
+
+ProsLoans <- subset( loans, select = c(
+  Term,
+  LoanStatus,
+  BorrowerRate,
+  ListingCategory..numeric.,
+  BorrowerState,
+  Occupation,
+  EmploymentStatus,
+  CreditScoreRangeLower,
+  CreditScoreRangeUpper,
+  OpenCreditLines,
+  CurrentDelinquencies,
+  AmountDelinquent,
+  DebtToIncomeRatio,
+  StatedMonthlyIncome,
+  MonthlyLoanPayment
+  ))
+
+ProsLoans$Term <- as.factor(ProsLoans$Term)  #Change Term from int to fctr
+
+ProsLoans <- rename(ProsLoans, c(
+  "ListingCategory..numeric." = "ListingCategory")) #Shorten name
+
+ProsLoans$ListingCategory <- as.factor(
+  ProsLoans$ListingCategory)  #Change int to fctr
+
+```
+ 
+    
+
+###Final Object Variable Names
+  
+```{r}
+
+noNA <- na.exclude(ProsLoans)  #Take out loans with missing data
+
+str(noNA)  #Final object
+
+```
+
+  
+
+## Number of Loans
+  
+There are just short of 114,000 loans in our original dataset.  If we exclude loans with missing values (NAs), we have 97,903 loans.  This will be our final set of loans to analyze.
+  
+```{r Count}
+
+library(ggplot2)
+library(dplyr)
+
+nrow(loans)  #Original Data Set
+
+nrow(noNA)  #Final Data Set
+
+
+```
+  
+#Univariate Plots  
+  
+##Term
+  
+Most of our loans have a 36 month term, followed by a 60 month term, and a 12 month term being the least popular.
+
+```{r Term}
+
+summary(noNA$Term)
+
+qplot(Term, data = noNA)
+
+```
+
+  
+## Status of Loan
+  
+Each loan is set to one status of 12 possible, shown below.  Most loans are current or completed, with a little over 3000 in default.
+  
+```{r LoanStatus}
+
+summary(noNA$LoanStatus)
+
+ggplot(noNA, aes(LoanStatus)) +
+  geom_bar() +
+  coord_flip()
+
+ggplot(filter(noNA, LoanStatus != "Current" &
+                LoanStatus != "Completed"),
+                aes(LoanStatus)) +
+                geom_bar() +
+                scale_y_continuous(breaks = seq(0, 10000, 1000)) +
+                coord_flip()
+  
+```
+  
+  
+##Interest Rate
+  
+The most popular interest rates are in the 10-20% range, yet there seems to be another rate with a high count of borrowers, 32%.  According to Prosper.com, they offer loans with an APR as high as 35.99%.  They state, "Annual percentage rates (APRs) through Prosper range from 5.99% APR (AA) to 35.99% APR (HR) for first-time borrowers, with the lowest rates for the most creditworthy borrowers."
+  
+```{r BorrowerRate}
+
+library(gridExtra)
+
+summary(noNA$BorrowerRate)
+
+rate1 <- qplot(BorrowerRate, data = noNA, binwidth = 0.01) +
+  scale_x_continuous(limits = c(0,0.36), breaks = seq(0,0.36,0.02))
+
+rate2 <- ggplot(noNA, aes(BorrowerRate)) +
+  geom_density()
+
+grid.arrange(rate1,rate2,ncol = 1)
+
+```
+  
+##Loan Category
+  
+The category of the listing that the borrower selected when posting their listing: 
+  
+0 - Not Available  
+1 - Debt Consolidation  
+2 - Home Improvement  
+3 - Business  
+4 - Personal Loan  
+5 - Student Use  
+6 - Auto  
+7 - Other  
+8 - Baby and Adoption  
+9 - Boat  
+10 - Cosmetic Procedure  
+11 - Engagement Ring  
+12 - Green Loans  
+13 - Household Expenses  
+14 - Large Purchases  
+15 - Medical/Dental  
+16 - Motorcycle  
+17 - RV  
+18 - Taxes  
+19 - Vacation  
+20 - Wedding Loans  
+  
+Debt Consolidation looks like the most popular loan category by far.  In our second plot, we will exclude that category in order to zoom in on all of the other categories.  By doing this, we can see that "Home Improvement" and "Business" make up about 12% of our loans. 
+  
+```{r ListingCategory}
+
+summary(noNA$ListingCategory)
+
+qplot(ListingCategory, data = noNA)
+
+qplot(ListingCategory, data = filter(noNA,ListingCategory != 1)) +
+  scale_y_continuous(breaks = seq(0,10000,1000))
+
+```
+
+  
+##State
+  
+Looks like California has more loans than any other state.  This makes sense since Prosper is located in CA, and CA is in the top 10 when it comes to cost of living (more people in need of loans.)
+  
+```{r BorrowerState}
+sort(table(noNA$BorrowerState), decreasing = T)
+
+ggplot(noNA,aes(BorrowerState))+
+  geom_bar() +
+  coord_flip() +
+  theme_minimal(base_size = 8)
+
+ggplot(filter(noNA, BorrowerState != "CA"),aes(BorrowerState))+
+  geom_bar() +
+  coord_flip() +
+  theme_minimal(base_size = 8)
+
+```
+
+  
+##Occupation
+  
+Since we know that most loans are taken out in CA, it makes sense that we'd see a greater number for common occupations in that state, such as Computer Programmers.  But, since most of the occupations were classified as "Other" or "Professional", we have no way of knowing what occupation is truly the most common in loan applicants.  Still, we can omit those categories in our second graph to get a better idea of some of the more popular occupations.    
+  
+```{r Occupation}
+
+sort(table(noNA$Occupation), decreasing = T)
+
+ggplot(noNA, aes(Occupation)) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal(base_size = 7)
+
+ggplot(filter(noNA, Occupation != "Other" &
+  Occupation != "Professional"),
+  aes(Occupation)) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal(base_size = 7)
+
+```
+  
+##Employment
+  
+There are very few applicants that are not employed.  It would be difficult to secure a loan without some kind of employment.  The unemployed applicants could be students requesting a student loan of some kind that will have a deferred payment arrangement.  This is exactly what we were able to show when taking the unique occupations for the unemployed borrowers.  Most of them are students.
+  
+```{r EmploymentStatus}
+
+sort(table(noNA$EmploymentStatus), decreasing = T)
+
+ggplot(noNA, aes(EmploymentStatus)) +
+  geom_bar() +
+  coord_flip()
+
+ggplot(
+  filter(
+  noNA,
+  EmploymentStatus != "Employed" &
+  EmploymentStatus != "Full-time" &
+  EmploymentStatus != "Other"
+  ),
+  aes(EmploymentStatus)
+  ) +
+  geom_bar()
+  
+unique(filter(noNA, EmploymentStatus == "Not employed")$Occupation)
+
+```
+  
+##Credit Score
+  
+Most loan applicants have a credit score between 650 and 750, as seen in our histograms and boxplot.
+  
+```{r CreditScore}
+
+summary(noNA$CreditScoreRangeLower)
+summary(noNA$CreditScoreRangeUpper)
+
+ggplot(noNA, aes(CreditScoreRangeLower, CreditScoreRangeUpper)) +
+  geom_point(color = "red") +
+  geom_line(color = "blue") +
+  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
+  scale_y_continuous(limits = c(500,900), breaks = seq(500,900,50))
+
+
+credit1 <- ggplot(noNA, aes(CreditScoreRangeLower)) +
+  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
+  geom_histogram(color = "red", binwidth = 10)
+
+credit2 <- ggplot(noNA, aes(CreditScoreRangeUpper)) +
+  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
+  geom_histogram(color = "blue", binwidth = 10)
+
+grid.arrange(credit2, credit1, ncol = 1)
+
+ggplot(noNA, aes(x = 1, CreditScoreRangeUpper)) +
+  geom_boxplot()
+
+```
+  
+###Credit Score Buckets
+  
+Here, we will put our upper range credit scores into buckets to simplify for future analysis.  Investors/lenders normally put credit scores into 5 categories:  Bad, Poor, Fair, Good, and Excellent.  
+  
+  
+```{r New Variable}
+
+noNA$CreditScoreType <-
+  cut(
+  noNA$CreditScoreRangeUpper,
+  breaks = c(450,550,650,700,750,900),
+  labels = c("Bad", "Poor", "Fair", "Good", "Excellent")
+  )
+
+qplot(CreditScoreType, data = noNA)
+
+```
+
+
+  
+  
+##Credit Lines
+    
+Most people have around 7 open credit lines.
+    
+```{r OpenCreditLines}
+
+summary(noNA$OpenCreditLines)
+
+qplot(OpenCreditLines, data = noNA)
+
+qplot(OpenCreditLines, data = noNA, binwidth = 1) +
+  scale_x_continuous(limits = c(0,25), breaks = seq(0,25,1))
+
+```
+  
+
+##Delinquencies
+  
+In order to get a better idea of the number of delinquencies in our set, we'll set the number of delinquencies as factor for our summary.  That will give us the number of loans with each particular number of delinquencies.  We can also zoom in on a section of the tail with our second plot, and then zoom out again by transforming our data in our third plot and using a boxplot to see outliers in the fourth plot.
+  
+```{r CurrentDelinquencies}
+
+table(as.factor(noNA$CurrentDelinquencies))
+
+delin_plot1 <- qplot(CurrentDelinquencies, data = noNA)
+
+delin_plot2 <- ggplot(noNA, aes(CurrentDelinquencies)) +
+  geom_histogram(binwidth = 1) +
+  scale_x_continuous(limits = c(0,18), breaks = seq(0,18,2)) +
+  scale_y_continuous(limits = c(0,11000), breaks = seq(0,11000,1000))
+
+delin_log10 <- qplot(log10(CurrentDelinquencies), data = noNA)
+
+delin_boxplot <- ggplot(noNA, aes(x = 1, CurrentDelinquencies)) +
+  geom_boxplot(
+  fill = "white",
+  colour = "#3366FF",
+  outlier.colour = "red",
+  outlier.shape = 1)
+
+grid.arrange(delin_plot1, delin_plot2, delin_log10, delin_boxplot, ncol = 2)
+
+
+
+```
+  
+##Amount Delinquent
+  
+Most accounts are $0 delinquent, so our second set of summary data uses log10 to transform our data, adding 1 to avoid an Inf error.  When we filter out the accounts with $0 delinquent, we get 15,524 borrowers (around 15% of all borrowers) who have had a positive delinquent balance.  
+  
+
+```{r AmountDelinquent}
+
+summary(noNA$AmountDelinquent)
+
+summary(log10(noNA$AmountDelinquent + 1))
+
+nrow(filter(noNA, AmountDelinquent > 0))
+
+qplot(AmountDelinquent, data = noNA)
+
+qplot(log10(AmountDelinquent), data = noNA) +
+  ggtitle("Log10(AmountDelinquent)")
+
+```
+
+
+  
+
+##Debt to Income Ratio
+  
+In general, those with a higher debt to income ratio have a harder time qualifying for a loan.  You can see below that most borrowers stay between a 10 and 30% debt to income ratio.  It is very rare to see a DTIR above 50% since most lenders/investors do not give loans to people with DTIRs above 43%.  The higher the DTIR, the higher the risk of default.  There seems to be one major outlier, a whopping 1001% DTIR!  What's going on there?  Could be a mistake, or maybe there really is someone with 10x their income in debt.  I suppose that's why they need to consolidate.  Let's take a look at some of the outliers by filtering anything over 100%(1.0 DTIR.)  Many of these accounts show a high number of open credit lines and low Stated Monthly Income (possibly unverified income.)
+  
+> To calculate your debt-to-income ratio, you add up all your monthly debt payments and divide them by your gross monthly income. Your gross monthly income is generally the amount of money you have earned before your taxes and other deductions are taken out.
+  
+[Consumer Finance Website](www.ConsumerFinance.Gov)
+  
+```{r DebtToIncomeRatio}
+
+summary(noNA$DebtToIncomeRatio)
+summary(log10(noNA$DebtToIncomeRatio + 1))
+
+DTIR_plot1 <- qplot(DebtToIncomeRatio, data = noNA)
+
+DTIR_plot2 <- qplot(DebtToIncomeRatio, data = noNA, binwidth = 0.01) +
+  scale_x_continuous(limits = c(0,0.8), breaks = seq(0,0.8,0.1))
+
+DTIR_log10 <- qplot(log10(DebtToIncomeRatio), data = noNA)
+
+DTIR_boxplot <- ggplot(noNA, aes(x = 1, DebtToIncomeRatio)) +
+  geom_boxplot(
+  fill = "white",
+  colour = "#3366FF",
+  outlier.colour = "red",
+  outlier.shape = 1)
+
+grid.arrange(DTIR_plot1, DTIR_plot2, DTIR_log10, DTIR_boxplot, ncol = 2)
+
+```
+  
+  
+  
+###DTIR > 43% (0.43)
+  
+There are 8,819 out of 97,903 borrowers with DTIRs greater than 43%.  This shows that Prosper is not a traditional lending institution, although the majority of DTIRs are below 43%.  In order to spread out the risk of lending to applicants with high DTIRs, they have multiple investors that help give these borrowers a chance to qualify for a loan.  10.01 looks like the maximum DTIR and risk that investors are willing to take on.  There are a little over 200 borrowers with a 10.01 DTIR.  Later on in our analysis, we'll see what listing category is most popular for these borrowers.  I'm guessing it's going to be Loan Consolidation, but I guess we'll have to see.
+  
+```{r highDTIR}
+high_dtir <- filter(noNA, DebtToIncomeRatio > 0.43)
+
+nrow(high_dtir)
+
+summary(high_dtir$DebtToIncomeRatio)
+
+qplot(DebtToIncomeRatio, data = high_dtir, binwidth = .01)
+
+summary(subset(noNA, DebtToIncomeRatio == 10.01))
+```
+
+
+  
+##Stated Monthly Income
+  
+Most borrowers report having a monthly income somewhere between $2000 and $7000.
+  
+```{r StatedMonthlyIncome}
+
+summary(noNA$StatedMonthlyIncome)
+summary(log10(noNA$StatedMonthlyIncome + 1))
+
+income_plot1 <- qplot(StatedMonthlyIncome, data = noNA)
+
+income_plot2 <- qplot(StatedMonthlyIncome, data = noNA, binwidth = 1000) +
+  scale_x_continuous(limits = c(0,12000), breaks = seq(0,12000,2000))
+
+income_log10 <- qplot(log10(StatedMonthlyIncome), data = noNA)
+
+income_boxplot <- ggplot(noNA, aes(x = 1, StatedMonthlyIncome)) +
+  geom_boxplot(
+  fill = "white",
+  colour = "#3366FF",
+  outlier.colour = "red",
+  outlier.shape = 1)
+
+grid.arrange(income_plot1, income_plot2, income_log10, income_boxplot, ncol = 2)
+
+```
+  
+    
+##Loan Payments... Because Who Doesn't Love Loan Payments?
+  
+Looks like the majority  of loan payments are below $1000/month, and most of those are between $50 and $400/month.  When we adjust the scale and binwidth, we can see the spike in loan count around 175.
+  
+```{r MonthlyLoanPayment}
+
+summary(noNA$MonthlyLoanPayment)
+
+payment1 <- qplot(MonthlyLoanPayment, data = noNA)
+
+payment2 <- qplot(MonthlyLoanPayment, data = noNA, binwidth = 1) +
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,100))
+  
+grid.arrange(payment1,payment2,ncol = 1)
+
+```
+  
+##Summary of Univariate Plots and Focus of Analysis
+###The Interest is in the Interest!
+  
+Our main focus will be on exploring the impact of any given variable on the interest rate that each borrower is given.  For example, how does a person's credit score or debt-to-income ratio(DTIR) impact the rate?  Will someone living in CA get the same interest rate as someone with the same stats living in TX?  Will a person's occupation or income make a difference?  
+  
+So far, we've observed a few things  
+  
++ 75% of our loans have a 36 month term
++ Around 3,000 accounts are in default
++ Most borrowers have an interest rate between 10 and 20%, although there are also quite a few at 32%
++ A little over 50% of loans are for debt consolidation
++ CA has the highest number of borrowers, followed by FL, TX, and NY
++ Aside from "Other" and "Professional", "Computer Programmer" and "Executive" are the top occupations
++ Most borrowers are employed, around 1% are self-employed, 0.7% are retired, and less than 0.1% are unemployed
++ Most credit scores are between 650 and 750
++ Most borrowers have around 7 open credit lines
++ A little over 5% of loans have been in default more than twice
++ About 15% of our borrowers have had a positive "Amount Delinquent"
++ Most borrowers have a DTIR somewhere between 10% and 30%
++ Most reported income is between $2,000 to $7,000 per month
++ The majority of monthly payments are under $1,000 with a count spike in loans with a $175/month payment. 
+    
+  
+##Bivariate Plots
+  
+###Loan Payments < $1200/month with Income < $20,000/month
+  
+```{r StatedMonthlyIncome/Term}
+
+under20 <- filter(noNA, StatedMonthlyIncome < 20000)
+
+ggplot(under20, aes(Term, StatedMonthlyIncome)) +
+  geom_boxplot(
+  fill = "white",
+  colour = "#3366FF",
+  outlier.colour = "red",
+  outlier.shape = 1)
+
+ggplot(under20, aes(MonthlyLoanPayment,StatedMonthlyIncome)) + 
+  geom_point(alpha = 0.05) +
+  geom_smooth(method = 'lm') +
+  scale_x_continuous(limits = c(0,1200), breaks = seq(0,1200,100))
+
+```
+  
+###Loan Payments < $1000/month with Income < $10,000/month
+  
+A $175/month loan payment looks like the most common across all income levels.  However, there is a clear trend upward since those with higher loan payments generally have a higher income.
+  
+```{r MonthlyLoanPayment/Income}
+
+under10 <- filter(noNA, StatedMonthlyIncome < 10000)
+
+ggplot(under10, aes(MonthlyLoanPayment,StatedMonthlyIncome)) + 
+  geom_point(alpha = 0.08, color = "blue") +
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,100)) +
+  geom_smooth(method = 'lm', color = "red")
+
+```
+   
+---
+
+###Rate/Credit
+  
+You can see how credit score can make a big difference when it comes to the borrower rate in the plots below.  However, there are still quite a few outliers we could examine.  If we create a subset of borrowers with Credit Scores above 780 and a Rate above 0.25, we get 239 loans/borrowers.  After summarising and plotting all of the variables looking for one that could give us some insight into what is going on here, I came up short.  There really wasn't any one variable that stood out as being the reason for such high rates for what seems to be credit worthy borrowers.  Maybe something would stand out in a further analysis of all 81 variables from our original dataset.
+  
+```{r BorrowerRate/CreditScore}
+
+ggplot(noNA, aes(as.factor(CreditScoreRangeUpper), BorrowerRate)) +
+  geom_boxplot()
+
+upper_outliers <-
+  subset(noNA, CreditScoreRangeUpper > 780 & BorrowerRate > 0.25)
+
+summary(upper_outliers)
+```
+  
+```{r Smooth}
+
+ggplot(noNA, aes(CreditScoreRangeUpper, BorrowerRate)) +
+         geom_smooth()
+
+```
+
+---
+
+###DTIR/Term
+    
+In the boxplots below, we can see the DTIR (less than 1%) summaries for each loan term.  As expected, those with the least amount of debt tend to take out the short term loans, since they can afford the higher payments per month.  Those that have higher DTIRs tend to try and keep their monthly payments as low as possible with a longer term.
+  
+```{r DTIR/Term}
+
+ggplot(noNA, aes(Term, DebtToIncomeRatio)) +
+  geom_boxplot(
+  fill = "white",
+  colour = "#3366FF",
+  outlier.colour = "red",
+  outlier.shape = 1
+  ) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.1)) +
+  ggtitle("DTIR/Term")
+
+```
+
+###High DTIR
+  
+  
+Let's take a further look at our high DTIR borrowers (almost 9,000!)  Not surprisingly, "Debt Consolidation" is the most popular category.  "Not Available" and "Other" are really just unknown categories, so the other popular categories are "Home Improvement" and "Business".  This isn't really any different than our analysis of all DTIRs.  About 56% of all loans are for debt consolidation and about 59% of high DTIR loans are for debt consolidation.  That's only slightly higher.  So, not really much to glean from this particular graph.
+  
+0 - Not Available  
+1 - Debt Consolidation  
+2 - Home Improvement  
+3 - Business  
+4 - Personal Loan  
+5 - Student Use  
+6 - Auto  
+7 - Other  
+8 - Baby and Adoption  
+9 - Boat  
+10 - Cosmetic Procedure  
+11 - Engagement Ring  
+12 - Green Loans  
+13 - Household Expenses  
+14 - Large Purchases  
+15 - Medical/Dental  
+16 - Motorcycle  
+17 - RV  
+18 - Taxes  
+19 - Vacation  
+20 - Wedding Loans  
+  
+```{r}
+
+nrow(high_dtir)
+
+ggplot(high_dtir, aes(ListingCategory)) +
+  geom_bar() +
+  ggtitle("DTIRs Above 43%")
+
+5200/8819
+```
+  
+---
+  
+##Multivariate Plots
+  
+###Boxplots  
+  
+```{r Facet-Status}
+
+ggplot(noNA, aes(LoanStatus,BorrowerRate, colour = Term)) +
+  geom_boxplot() +
+  coord_flip()
+
+ggplot(noNA, aes(Term, BorrowerRate)) +
+  geom_boxplot(aes(group = Term)) +
+  facet_wrap(~LoanStatus) +
+  ggtitle("Loan Status Rates per Term")
+
+```
+  
+---
+
+###Rates/Category
+
+Our boxplots below show the maximum rates in categories 0-7 (more common loans), which seems to also be the categories where bad/poor credit is more readily accepted.  We can easily see in the second visualization that categories 4 and 5 only have 36 month terms.  Also, in most categories you can see the longer the term, the higher the rate, although in some cases the 60 month term has similar or even lower rates than a 36 month term (categories 7 and 8 for example.)  
+  
+```{r Facet-Category}
+
+ggplot(noNA,
+       aes(ListingCategory, BorrowerRate, colour = CreditScoreType)) +
+       geom_boxplot()
+
+ggplot(noNA, aes(Term, BorrowerRate)) +
+  geom_boxplot() +
+  facet_wrap( ~ ListingCategory) +
+  ggtitle("Category Rates per Term")
+
+```
+  
+---
+  
+### State Interest Rate Trends
+  
+  
+```{r State-Regions}
+
+northeast <-
+  ggplot(noNA,
+  aes(BorrowerState, BorrowerRate, colour = CreditScoreType)) +
+  geom_boxplot() +
+  scale_x_discrete(limits = c(
+  "CT", 
+  "ME", 
+  "MA", 
+  "NH", 
+  "RI", 
+  "VT", 
+  "NJ", 
+  "NY", 
+  "PA"
+  )) +
+  ggtitle("NorthEastern States")
+  
+midwest <-
+  ggplot(noNA,
+  aes(BorrowerState, BorrowerRate, colour = CreditScoreType)) +
+  geom_boxplot() +
+  scale_x_discrete(limits = c(
+  "IN",
+  "IL",
+  "MI",
+  "OH",
+  "WI",
+  "IA",
+  "KS",
+  "MN",
+  "MO",
+  "NE",
+  "ND",
+  "SD"
+  )) +
+  ggtitle("MidWestern States")
+  
+south <-
+  ggplot(noNA,
+  aes(BorrowerState, BorrowerRate, colour = CreditScoreType)) +
+  geom_boxplot() +
+  scale_x_discrete(
+  limits = c(
+  "DE",
+  "DC",
+  "FL",
+  "GA",
+  "MD",
+  "NC",
+  "SC",
+  "VA",
+  "WV",
+  "AL",
+  "KY",
+  "MS",
+  "TN",
+  "AR",
+  "LA",
+  "OK",
+  "TX"
+  )
+  ) +
+  ggtitle("Southern States")
+  
+west <-
+  ggplot(noNA,
+  aes(BorrowerState, BorrowerRate, colour = CreditScoreType)) +
+  geom_boxplot() +
+  scale_x_discrete(limits = c(
+  "AZ",
+  "CO",
+  "ID",
+  "NM",
+  "MO",
+  "UT",
+  "NV",
+  "WY",
+  "AK",
+  "CA",
+  "HI",
+  "OR",
+  "WA"
+  )) +
+  ggtitle("Western States")
+  
+northeast
+midwest
+south
+west
+
+```
+
+  
+
+Are there any differences between California, Texas, Florida, and New York?  Any differences may be due to usury laws in each state.  Looking at the Texas plots makes me think that there could be a program or law protecting those with credit scores lower than 600.  According to [Debt.org](https://www.debt.org/faqs/americans-in-debt/consumer-texas/), Texas consumers have some of the lowest credit scores in the country.  
+
+```{r Grid-States}
+
+CA_Rate <-
+  ggplot(data = filter(noNA, BorrowerState == "CA"),
+  aes(CreditScoreType, BorrowerRate)) +
+  geom_boxplot() +
+  ggtitle("California")
+  
+TX_Rate <-
+  ggplot(data = filter(noNA, BorrowerState == "TX"),
+  aes(CreditScoreType, BorrowerRate)) +
+  geom_boxplot() +
+  ggtitle("Texas")
+  
+FL_Rate <-
+  ggplot(data = filter(noNA, BorrowerState == "FL"),
+  aes(CreditScoreType, BorrowerRate)) +
+  geom_boxplot() +
+  ggtitle("Florida")
+  
+NY_Rate <-
+  ggplot(data = filter(noNA, BorrowerState == "NY"),
+  aes(CreditScoreType, BorrowerRate)) +
+  geom_boxplot() +
+  ggtitle("New York")
+  
+  grid.arrange(CA_Rate, TX_Rate, FL_Rate, NY_Rate, ncol = 2)
+
+
+```
+  
+  
+Let's take a closer look at that Texas plot...
+
+It looks like borrowers with a credit score of 600 or lower in TX all have the same term, 36 months.  Most of these borrowers selected "Not Available" (0) as their Listing Category.  Many of them have defaulted or have been charged off, other than the couple of car loans with lower rates and a few others here and there.  This is all very interesting, but it doesn't really tell us for sure if these borrowers were given special treatment.
+
+```{r Texas}
+
+TX_BadCredit <- filter(noNA, BorrowerState == "TX" & CreditScoreType == "Bad")
+
+summary(TX_BadCredit)
+
+ggplot(aes(LoanStatus, BorrowerRate, colour = ListingCategory), data = TX_BadCredit) +
+  geom_point(alpha = 0.5) +
+  theme_minimal(base_size = 12) +
+  ggtitle("Texas Categories/Status")
+
+```
+
+---
+  
+###Occupation Rates and DTIR
+  
+Occupation is a difficult variable to visualize with it being a categorical variable with multiple characters.  However, if we simply plot the mean and median rates using columns on a flipped coordinate, we can zoom in a bit on our data.  We can see some interesting highs and lows, like our judges' low interest rates and our teacher's aides' high interest rates.
+
+  
+```{r Facet-Occupation}
+
+occ_group <- noNA %>% group_by(Occupation)
+
+occ_mean <-
+occ_group %>% summarise(
+Mean_DTIR = mean(DebtToIncomeRatio),
+Mean_Rate = mean(BorrowerRate),
+Mean_CreditScore = mean(CreditScoreRangeUpper)
+)
+
+occ_median <-
+occ_group %>% summarise(
+Median_DTIR = median(DebtToIncomeRatio),
+Median_Rate = median(BorrowerRate),
+Median_CreditScore = median(CreditScoreRangeUpper)
+)
+
+ggplot(occ_mean, aes(Occupation, Mean_Rate)) +
+geom_col(color = "yellow") +
+coord_flip() +
+theme_classic(base_size = 8)
+
+```
+  
+
+###Occupation - Top 10 Mean Interest Rates
+
+```{r topMean}
+
+arrange(top_n(occ_mean, 10, Mean_Rate),desc(Mean_Rate))
+
+```
+  
+  
+  
+```{r LowHigh}
+ggplot(filter(
+noNA,
+Occupation == c(
+"Judge",
+"Teacher's Aide"
+)
+), aes(Occupation, BorrowerRate)) +
+geom_boxplot() +
+facet_wrap( ~ Term) +
+ggtitle("Lowest/Highest Rates")
+```
+  
+  
+###Top 4/Bottom 4
+    
+```{r top/bottom}
+
+top4 <-
+  ggplot(filter(
+  noNA,
+  Occupation == c(
+  "Other",
+  "Professional",
+  "Computer Programmer",
+  "Executive"
+  )
+  ), aes(Occupation, BorrowerRate)) +
+  geom_boxplot() +
+  facet_wrap( ~ Term) +
+  theme_light(base_size = 6) +
+  ggtitle("Top 4 Occupations")
+
+bottom4 <-
+  ggplot(filter(
+  noNA,
+  Occupation == c(
+  "Homemaker",
+  "Student - College Sophomore",
+  "Student - College Freshman",
+  "Judge"
+  )
+  ), aes(Occupation, BorrowerRate)) +
+  geom_boxplot() +
+  facet_wrap( ~ Term) +
+  theme_light(base_size = 6) +
+  ggtitle("Bottom 4 Occupations")
+
+top4
+sort(table(noNA$Occupation), decreasing = T)[1:4]
+bottom4
+sort(table(noNA$Occupation), decreasing = T)[65:68]
+
+```
+
+  
+###Mean and Median Rate/DTIR/Credit Score per Term
+  
+```{r MeanMedian}
+three_terms <- noNA %>% group_by(Term)
+
+three_terms %>% summarise(Mean_DTIR = mean(DebtToIncomeRatio), Mean_Rate = mean(BorrowerRate), Mean_CreditScore = mean(CreditScoreRangeUpper))
+
+three_terms %>% summarise(Median_DTIR = median(DebtToIncomeRatio), Median_Rate = median(BorrowerRate), Median_CreditScore = median(CreditScoreRangeUpper))
+```
+  
+###Scatterplot Matrix
+   
+Using a sample size of 20,000, we can construct a scatterplot matrix showing correlation coefficients for 5 of our quantitative variables.  We can also see any significant differences in Term, whether having a 12 month, 36 month, or 60 month term makes a difference in correlation.  
+
++ Borrower Rate
++ Credit Score Range Upper
++ Debt to Income Ratio
++ Stated Monthly Income
++ Monthly Loan Payment
+
+```{r Matrix}
+
+library(GGally)
+library(scales)
+
+set.seed(12345)
+
+ggpairs(noNA[sample.int(nrow(noNA), 20000),],
+        columns = c(3, 9, 13:15),
+        ggplot2::aes(colour = Term, alpha = 0.1))
+
+```
+
+  
+##FINAL PLOT #1
+###Impact of DTIR and Credit Score on Interest Rates
+  
+```{r Final}
+
+ggplot(noNA, aes(DebtToIncomeRatio,BorrowerRate, color = CreditScoreRangeUpper)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  scale_y_continuous(limits = c(0.04,0.36), breaks = seq(0.04,0.36,0.02)) +
+  scale_x_continuous(limits = c(0,1), breaks = seq(0,1,0.25)) +
+  ggtitle("Impact of DTIR and Credit Score on Interest Rates") +
+  labs(color = "Credit Score", x = "DTIR", y = "Interest Rate") +
+  theme_dark(base_size = 11)
+
+```
+  
+
+Our plot above shows lighter colored dots mostly at the bottom and darker colors at the top.  This makes it obvious how credit score impacts interest rate in most cases.  We can also see a clear (multicolored) line at the 32% interest rate and a rather dark line at 35%.  There is only a slight correlation between DTIR and interest rate.  If you have a DTIR above 30%, you may end up with a slightly higher interest rate.  Most investors probably just want to see that you can be trusted, thus the correlation between rate and credit score.  This plot shows the general findings that emerged from our exploration of interest rate, DTIR, and Credit Scores.
+
+
+##FINAL PLOT #2
+  
+###Impact of Listing Category on Interest Rate
+
+
+Number | Category
+------ | --------
+0      | Not Available  
+1      | Debt Consolidation  
+2      | Home Improvement  
+3      | Business  
+4      | Personal Loan  
+5      | Student Use  
+6      | Auto  
+7      | Other  
+8      | Baby and Adoption  
+9      | Boat  
+10     | Cosmetic Procedure  
+11     | Engagement Ring  
+12     | Green Loans  
+13     | Household Expenses  
+14     | Large Purchases  
+15     | Medical/Dental  
+16     | Motorcycle  
+17     | RV  
+18     | Taxes  
+19     | Vacation  
+20     | Wedding Loans 
+  
+  
+```{r Second-Final}
+
+LC_plot1 <- ggplot(filter(noNA, ListingCategory == c(0,1,2,3,4,5,6,7)),
+       aes(ListingCategory, BorrowerRate, colour = CreditScoreType)) +
+       geom_boxplot() +
+       labs(title = "Impact of Listing Category on Interest Rate", 
+            x = "Listing Category", y = "Interest Rate", colour = "Credit Score")
+
+LC_plot2 <- ggplot(filter(noNA, ListingCategory == c(8,9,10,11,12,13,14,15,16,17,18,19,20)),
+       aes(ListingCategory, BorrowerRate, colour = CreditScoreType)) +
+       geom_boxplot() +
+       labs(x = "Listing Category", y = "Interest Rate", colour = "Credit Score")
+
+grid.arrange(LC_plot1, LC_plot2, ncol = 1)
+
+```
+  
+The plot above is from our analysis of Interest Rates in each Listing Category. For the final plot, I split the categories up, with our more popular categories at the top of our grid and less popular ones at the bottom.  Among our popular categories, "Debt Consolidation" looks to have some of the highest rates and "Not Available", some of the lowest.  Among our less popular group, there doesn't seem to be any borrowers with bad credit and very little with poor credit even.  This may be why we see lower rates in our plot at the bottom.  I'm sure in order to get a loan for an "RV" or "Vacation", you'd have to have pretty good credit.  These types of loans may also have shorter terms, which also means lower interest rates.  We did see in our original exploration of Listing Categories that categories 0, 4, and 5 contained no 12 month loan terms at all.  
+
+
+##FINAL PLOT #3
+  
+###MidWest Interest Rates
+
+```{r}
+
+midwest +
+  labs(x = "States", y = "Interest Rates", colour = "Credit") +
+  theme_classic(base_size = 15, base_family = "serif")
+
+```
+  
+Since I live in the MidWest, specifically Wisconsin, I decided to make my final plot the MidWest plot.  We established in our analysis of state interest rates that some rates may be affected by usury laws.  When looking at the Midwest plot, SD stands out as a possibility of having restrictions on interest rates.  Or, maybe they just tend to have better credit in South Dakota?  When I look at Wisconsin, I notice the wide spread for bad credit in particular.  Overall, though, we're looking at lower interest rates for Good/Excellent credit.  That much remains clear.  
+  
+```{r}
+names(noNA)
+```
+  
+  
+##Closing Thoughts
+
+In our analysis of Prosper Loans, we started out with 81 variables and settled on 15 to explore, adding one more along the way. After cleaning up our data (excluding NAs), we were able to keep 97,903 loans in our set.  At times, it was difficult plotting the categorical data using just one plot.  With the lengthy characters in a few of our variables, we solved this problem by breaking them up into categories.  For our "ListingCategory", we grouped them by most popular and least popular in our final plots section.  For our "BorrowerState" variable, we grouped them by region.  And, for our "Occupation" variable, we plotted those with highest/lowest count and interest rates.  
+  
+Our plots showed a moderate negative correlation between interest rate and credit score, but surprisingly showed a weak correlation between interest rate and all other variables, including DTIR.  Two other variables that showed a low/moderate correlation are reported income and monthly loan payment.  This isn't too surprising, as I'm sure most high income borrowers are hoping to pay down their loans quickly with "extra" income.  
+  
+We've seen a spike in our data with the popular $175/month loan payment.  The loan payments are determined by the original loan balance, interest rate, and term.  So, in the future we could explore our "LoanOriginalAmount" variable from our original dataset.
+
